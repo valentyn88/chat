@@ -15,6 +15,7 @@ func main() {
 	var (
 		url    = "ws://localhost:8000/ws"
 		dialer *websocket.Dialer
+		reader = bufio.NewReader(os.Stdin)
 	)
 
 	conn, _, err := dialer.Dial(url, nil)
@@ -23,9 +24,9 @@ func main() {
 		return
 	}
 
-	go read(conn)
+	go readMsg(conn)
 
-	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Console chat started")
 
 	for {
 		//Read stdin
@@ -60,12 +61,12 @@ func main() {
 	}
 }
 
-func read(conn *websocket.Conn) {
+func readMsg(conn *websocket.Conn) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("error: %v", err)
-			return
+			continue
 		}
 
 		fmt.Printf("Received: %s\n", message)
