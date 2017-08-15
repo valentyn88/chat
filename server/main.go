@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
 	"log"
@@ -16,6 +17,7 @@ var (
 	broadcast   = make(chan []byte)
 	upgrader    = websocket.Upgrader{}
 	letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	memoryLimit = 52428800
 )
 
 func init() {
@@ -40,9 +42,8 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 	defer ws.Close()
 
-	clients[ws] = true
-
 	for {
+		clients[ws] = true
 		mtype, r, err := ws.NextReader()
 		if err != nil {
 			log.Printf("error: %v", err)
@@ -63,7 +64,8 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			}
 			defer f.Close()
 
-			buf := make([]byte, 4096)
+			buffSize := memoryLimit / len(clients)
+			buf := make([]byte, buffSize)
 			for {
 				n, err := r.Read(buf)
 				if err != nil {
