@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"github.com/gorilla/websocket"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -41,7 +43,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	clients[ws] = true
 
 	for {
-		mtype, message, err := ws.ReadMessage()
+		mtype, r, err := ws.NextReader()
 		if err != nil {
 			log.Printf("error: %v", err)
 			delete(clients, ws)
@@ -49,13 +51,37 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if mtype == websocket.TextMessage {
-			broadcast <- message
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(r)
+			broadcast <- buf.Bytes()
 		} else if mtype == websocket.BinaryMessage {
-			err := ioutil.WriteFile("../tmp/"+randStringRunes(10), message, 0644)
+			f, err := os.Create("../tmp/" + randStringRunes(10))
 			if err != nil {
 				log.Printf("error: %v", err)
 				delete(clients, ws)
 				break
+			}
+			defer f.Close()
+
+			buf := make([]byte, 4096)
+			for {
+				n, err := r.Read(buf)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					log.Printf("error: %v", err)
+					break
+				}
+
+				if n == 0 {
+					break
+				}
+
+				if _, err := f.Write(buf[:n]); err != nil {
+					log.Printf("error: %v", err)
+					break
+				}
 			}
 		}
 	}
